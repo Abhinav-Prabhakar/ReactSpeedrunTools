@@ -70,16 +70,14 @@ $secondary-text: #f8fafc
 `;
 
 	public static readonly getFontStyling = (fontFileNames: string[], fontFamily: string): string => {
-		const isSingleFile = fontFileNames.length === 1;
-
 		const fontFaces = [...fontFileNames]
 			.sort((a, b) => a.localeCompare(b))
 			.map(fileName => {
 				const baseName = path.parse(fileName).name.toLowerCase();
 				const isItalic = baseName.includes('italic');
-				const isVariable = baseName.includes('variable');
+				const isVariable = baseName.includes('variable') || (fontFamily === 'Inter' && baseName === 'inter');
 				const weight = getFontWeight(baseName);
-				const fontWeight = isVariable || (isSingleFile && !weight) ? '100 900' : weight ?? '400';
+				const fontWeight = isVariable ? '100 900' : weight ?? '400';
 
 				return `@font-face
 	font-family: "${fontFamily}"

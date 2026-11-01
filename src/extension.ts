@@ -377,7 +377,8 @@ async function addFont() {
 		const fontMarker = `/* ${selectedFont} */`;
 
 		if (!existingFontStyles.includes(fontMarker)) {
-			writeFileEnsuringDirectory(fontStylesPath, StringGenerators.getFontStyling(fontFileNames, selectedFont) + existingFontStyles);
+			const separator = existingFontStyles.length > 0 && !existingFontStyles.endsWith('\n') ? '\n\n' : '';
+			writeFileEnsuringDirectory(fontStylesPath, existingFontStyles + separator + StringGenerators.getFontStyling(fontFileNames, selectedFont));
 		}
 
 		ensureSassImport(projectPaths.styles, 'fonts');
