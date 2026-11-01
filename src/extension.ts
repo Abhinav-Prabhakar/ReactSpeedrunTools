@@ -58,7 +58,7 @@ function createReactComponent() {
 function addFont() {
 	const fonts = ['Inter', 'Poppins', 'Plus Jakarta Sans', 'Roboto'];
 	vscode.window.showQuickPick(fonts).then(selectedFont => {
-		fs.cpSync(path.join(extensionPath, 'src/fonts', selectedFont!), fontsPath, { recursive: true });
+		fs.cpSync(path.join(extensionPath, 'assets/fonts', selectedFont!), fontsPath, { recursive: true });
 
 		const fontStylesFile = path.join(sourceCodePath, '_fonts.sass');
 		const existingFontStyles = fs.existsSync(fontStylesFile) ? fs.readFileSync(fontStylesFile, { encoding: 'utf-8' }) : '';
