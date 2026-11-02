@@ -12,3 +12,6 @@ upstream license file in its folder.
 
 The fonts are redistributed unmodified as part of the extension and are copied
 into user projects only when the user runs **Add A Font**.
+
+The bundled WOFF2 files are format conversions of the upstream TTF releases and
+retain the upstream names and glyph data.

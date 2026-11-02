@@ -40,6 +40,13 @@ suite('StringGenerators', () => {
 		assert.doesNotMatch(output, /\.ttf\.ttf/);
 	});
 
+	test('woff2 font faces use the woff2 format', () => {
+		const output = StringGenerators.getFontStyling(['Poppins-Regular.woff2'], 'Poppins', 'css');
+
+		assert.match(output, /format\("woff2"\)/);
+		assert.match(output, /Poppins-Regular\.woff2/);
+	});
+
 	test('variable fonts use a weight range', () => {
 		const output = StringGenerators.getFontStyling(['Inter.ttf'], 'Inter', 'scss');
 

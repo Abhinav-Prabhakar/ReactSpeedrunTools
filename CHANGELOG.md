@@ -15,6 +15,8 @@ All notable changes to this extension are documented here.
 - Output channel logging, progress reporting, cancellation, and backups for
   destructive operations.
 - Bundled font licenses and an extension icon.
+- WOFF2 bundled fonts, reducing the VSIX from about 3 MB to about 1 MB.
+- Automatic backup pruning that keeps the newest 20 backups per workspace.
 - ESLint 9 flat config, esbuild bundling, `@vscode/test-cli` tests, and GitHub
   Actions CI.
 

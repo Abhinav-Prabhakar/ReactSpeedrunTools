@@ -203,7 +203,43 @@ export async function backupFiles(
 	}
 
 	log(`Backed up ${existing.length} file(s) to ${directory}`);
+	await pruneBackups(MAX_BACKUPS);
 	return { directory, files: existing };
+}
+
+const MAX_BACKUPS = 20;
+
+async function pruneBackups(keep: number): Promise<void> {
+	if (!storageRoot) {
+		return;
+	}
+
+	const backupRoot = path.join(storageRoot, 'backups');
+	let entries: [string, vscode.FileType][];
+
+	try {
+		entries = await vscode.workspace.fs.readDirectory(toUri(backupRoot));
+	} catch (error) {
+		if (isMissingFile(error)) {
+			return;
+		}
+		throw error;
+	}
+
+	const expired = entries
+		.filter(([, type]) => (type & vscode.FileType.Directory) !== 0)
+		.map(([name]) => name)
+		.sort()
+		.reverse()
+		.slice(keep);
+
+	for (const name of expired) {
+		await deletePath(path.join(backupRoot, name));
+	}
+
+	if (expired.length > 0) {
+		log(`Pruned ${expired.length} old backup(s), keeping the newest ${keep}.`);
+	}
 }
 
 export async function revealBackup(backup: BackupResult | undefined): Promise<void> {

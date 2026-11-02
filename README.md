@@ -10,11 +10,14 @@ and stylesheet syntax.
 
 ## Installation
 
-Install **React Speedrun Tools** from the VS Code Marketplace, or install a VSIX:
+Install the packaged VSIX:
 
 ```bash
 code --install-extension react-speedrun-tools-0.1.0.vsix
 ```
+
+The extension is prepared for Marketplace publishing; `npm run package` builds a
+VSIX locally.
 
 ## Commands
 
@@ -59,7 +62,7 @@ cursor on the `return` line.
 
 ### Add A Font
 
-Bundled families:
+Bundled families (WOFF2):
 
 - Inter
 - Poppins
@@ -134,7 +137,8 @@ detection covers `src/index.*`, `src/app.*`, and `app/globals.*` (including
   workspaces because project detection and package-manager installation need
   direct file-system access.
 
-Backups are not pruned automatically.
+Backups are pruned automatically: only the 20 most recent backups are kept per
+workspace.
 
 ## Requirements
 
@@ -159,6 +163,15 @@ esbuild watch task.
 
 The extension is bundled with esbuild into `dist/extension.js`. TypeScript still
 compiles to `out/` for tests and type information.
+
+## Releasing
+
+1. Update the version in `package.json` and `CHANGELOG.md`.
+2. Run `npm run package` and test the generated VSIX.
+3. Publish with `npx vsce publish -p "$VSCE_PAT"`.
+
+`npm run package` runs the type-check, lint, and esbuild bundle before invoking
+`vsce`.
 
 ## License
 
