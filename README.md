@@ -32,6 +32,12 @@ An extension to help you scaffold and develop React projects faster.
 3. Run one of the commands under **React Speedrun Tools**.
 
 Commands that write files ask for confirmation before replacing existing files.
+Before a file is overwritten or deleted, the extension saves a copy in its
+workspace storage. Use **Reveal Backup** in the confirmation message to open the
+backup folder, or check the **React Speedrun Tools** output channel for the path.
+
+Long-running operations such as scaffolding and copying fonts show progress and
+can be cancelled. Sass installation is skipped in untrusted workspaces.
 
 ## Settings
 
@@ -51,6 +57,10 @@ Commands that write files ask for confirmation before replacing existing files.
 
 Tailwind scaffolding generates the CSS entry with the correct Tailwind import,
 but the project still needs Tailwind configured in its build tool.
+
+The extension requires a local workspace. It is disabled in virtual workspaces
+because project detection and Sass installation need direct file-system and
+package-manager access.
 
 ## Development
 
