@@ -175,10 +175,17 @@ compiles to `out/` for tests and type information.
 
 ## Releasing
 
+The Marketplace extension is `AbhinavPrabhakar.react-speedrun-tools`. The
+publisher account is **AbhinavPrabhakar** at
+<https://marketplace.visualstudio.com/manage/publishers/AbhinavPrabhakar>.
+
 1. Update the version in `package.json` and `CHANGELOG.md`.
 2. Run `npm run package` and test the generated VSIX.
-3. Set the `VSCE_PAT` repository secret.
-4. Push a `v*` tag (for example `v0.1.0`) or run the **Release** workflow
+3. Sign in to the publisher account and create an Azure DevOps personal access
+   token with **Marketplace → Manage** scope.
+4. Save the token as the `VSCE_PAT` repository secret, or verify it locally with
+   `npx vsce verify-pat AbhinavPrabhakar`.
+5. Push a `v*` tag (for example `v0.1.0`) or run the **Release** workflow
    manually with `publish` enabled.
 
 The release workflow lints, type-checks, bundles, tests, packages the VSIX,

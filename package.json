@@ -3,7 +3,7 @@
   "displayName": "React Speedrun Tools",
   "description": "Scaffold and style React apps with Vite, Next.js, fonts, and color variables.",
   "version": "0.1.0",
-  "publisher": "abhinav-prabhakar",
+  "publisher": "AbhinavPrabhakar",
   "license": "MIT",
   "icon": "assets/icon.png",
   "repository": {

@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 
 suite('Extension', () => {
 	test('activates and registers its commands', async () => {
-		const extension = vscode.extensions.getExtension('abhinav-prabhakar.react-speedrun-tools');
+		const extension = vscode.extensions.getExtension('AbhinavPrabhakar.react-speedrun-tools');
 		assert.ok(extension, 'the extension should be discoverable in the test host');
 
 		await extension.activate();
