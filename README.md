@@ -166,7 +166,7 @@ npm test              # @vscode/test-cli integration tests
 npm run package       # build a VSIX
 ```
 
-`npm test` downloads the pinned VS Code test host on first run and uses
+`npm test` downloads the stable VS Code test host on first run and uses
 `@vscode/test-cli`. Press `F5` in VS Code to launch the extension with the
 esbuild watch task.
 
