@@ -1,8 +1,29 @@
 {
   "name": "react-speedrun-tools",
   "displayName": "React Speedrun Tools",
-  "description": "",
-  "version": "0.0.1",
+  "description": "Scaffold and style React apps with Vite, Next.js, fonts, and color variables.",
+  "version": "0.1.0",
+  "publisher": "abhinav-prabhakar",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Abhinav-Prabhakar/ReactSpeedrunTools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Abhinav-Prabhakar/ReactSpeedrunTools/issues"
+  },
+  "homepage": "https://github.com/Abhinav-Prabhakar/ReactSpeedrunTools#readme",
+  "keywords": [
+    "react",
+    "vite",
+    "nextjs",
+    "scaffold",
+    "typescript",
+    "sass",
+    "css",
+    "fonts"
+  ],
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -10,7 +31,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "capabilities": {
     "virtualWorkspaces": {
       "supported": false,
@@ -80,24 +101,28 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run check-types && npm run lint && npm run bundle",
     "compile": "tsc -p ./",
+    "check-types": "tsc --noEmit -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "bundle": "node esbuild.js",
+    "bundle:watch": "node esbuild.js --watch",
+    "pretest": "npm run compile && npm run bundle && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "package": "vsce package"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.0.0",
     "@types/vscode": "^1.77.0",
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
-    "@typescript-eslint/eslint-plugin": "^5.56.0",
-    "@typescript-eslint/parser": "^5.56.0",
-    "eslint": "^8.36.0",
-    "glob": "^8.1.0",
-    "mocha": "^10.2.0",
-    "typescript": "^4.9.5",
-    "@vscode/test-electron": "^2.3.0"
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
   }
 }
