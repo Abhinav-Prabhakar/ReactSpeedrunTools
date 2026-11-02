@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import StringGenerators from './stringGenerators';
 import { Subscription } from './dataModels';
+import { scaffoldReactApp } from './scaffold';
 import {
 	getProjectInfo,
 	ProjectInfo,
@@ -67,6 +68,14 @@ function getStyleModulePath(project: ProjectInfo, moduleName: 'fonts' | 'colors'
 	const extension = project.syntax === 'scss' ? 'scss' : project.syntax === 'sass' ? 'sass' : 'css';
 	const partial = project.syntax !== 'css';
 	return path.join(path.dirname(project.stylesPath), `${partial ? '_' : ''}${moduleName}.${extension}`);
+}
+
+async function scaffoldReactAppCommand() {
+	const root = await resolveWorkspaceRoot();
+	if (!root) {
+		return;
+	}
+	await scaffoldReactApp(getProject(root));
 }
 
 async function removeBoilerplate() {
@@ -265,6 +274,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(channel);
 	const createSubscriptions = (subscriptions: Subscription[]) => subscriptions.map(subscription => vscode.commands.registerCommand(subscriptionPrefix + subscription.commandId, subscription.action));
 	context.subscriptions.push(...createSubscriptions([
+		new Subscription('scaffoldReactApp', scaffoldReactAppCommand),
 		new Subscription('removeBoilerplate', removeBoilerplate),
 		new Subscription('createReactComponent', createReactComponent),
 		new Subscription('addFont', addFont),
