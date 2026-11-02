@@ -193,6 +193,9 @@ publishes to the Marketplace when `VSCE_PAT` is available, and attaches the VSIX
 to the GitHub release for tag builds. `npm run package` also runs the
 type-check, lint, and esbuild bundle before invoking `vsce`.
 
+See the full account recovery and publishing runbook:
+<https://github.com/Abhinav-Prabhakar/ReactSpeedrunTools/blob/main/docs/PUBLISHING.md>
+
 ## License
 
 The extension source is licensed under the [MIT License](LICENSE).
