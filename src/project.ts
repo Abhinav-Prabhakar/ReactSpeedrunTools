@@ -136,7 +136,8 @@ function detectStyling(root: string, setting: StylingSetting): Styling {
 	if (
 		fs.existsSync(path.join(root, 'src/index.sass')) ||
 		fs.existsSync(path.join(root, 'app/globals.sass')) ||
-		fs.existsSync(path.join(root, 'src/app/globals.sass'))
+		fs.existsSync(path.join(root, 'src/app/globals.sass')) ||
+		fs.existsSync(path.join(root, 'styles/globals.sass'))
 	) {
 		return 'sass';
 	}
@@ -144,7 +145,8 @@ function detectStyling(root: string, setting: StylingSetting): Styling {
 	if (
 		fs.existsSync(path.join(root, 'src/index.scss')) ||
 		fs.existsSync(path.join(root, 'app/globals.scss')) ||
-		fs.existsSync(path.join(root, 'src/app/globals.scss'))
+		fs.existsSync(path.join(root, 'src/app/globals.scss')) ||
+		fs.existsSync(path.join(root, 'styles/globals.scss'))
 	) {
 		return 'scss';
 	}
@@ -206,6 +208,9 @@ function getStylesPath(root: string, kind: ProjectKind, syntax: StyleSyntax, app
 			path.join(appRoot, 'globals.scss'),
 			path.join(appRoot, 'globals.sass'),
 			path.join(appRoot, 'globals.css'),
+			path.join(root, 'styles', 'globals.scss'),
+			path.join(root, 'styles', 'globals.sass'),
+			path.join(root, 'styles', 'globals.css'),
 		]
 		: [];
 	const candidates = kind === 'next'
