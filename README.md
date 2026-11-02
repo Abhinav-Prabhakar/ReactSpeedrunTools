@@ -168,10 +168,14 @@ compiles to `out/` for tests and type information.
 
 1. Update the version in `package.json` and `CHANGELOG.md`.
 2. Run `npm run package` and test the generated VSIX.
-3. Publish with `npx vsce publish -p "$VSCE_PAT"`.
+3. Set the `VSCE_PAT` repository secret.
+4. Push a `v*` tag (for example `v0.1.0`) or run the **Release** workflow
+   manually with `publish` enabled.
 
-`npm run package` runs the type-check, lint, and esbuild bundle before invoking
-`vsce`.
+The release workflow lints, type-checks, bundles, tests, packages the VSIX,
+publishes to the Marketplace when `VSCE_PAT` is available, and attaches the VSIX
+to the GitHub release for tag builds. `npm run package` also runs the
+type-check, lint, and esbuild bundle before invoking `vsce`.
 
 ## License
 
