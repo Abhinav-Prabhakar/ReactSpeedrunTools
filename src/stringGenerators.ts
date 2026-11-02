@@ -1,4 +1,5 @@
 import * as path from 'path';
+import type { Language, Styling, StyleSyntax } from './project';
 
 function getFontWeight(fileName: string): string | undefined {
 	const orderedWeights: Array<[RegExp, string]> = [
@@ -69,7 +70,28 @@ $secondary-color: #64748b
 $secondary-text: #f8fafc
 `;
 
-	public static readonly getFontStyling = (fontFileNames: string[], fontFamily: string): string => {
+	public static readonly getColorVariables = (syntax: StyleSyntax): string => {
+		if (syntax === 'css') {
+			return `:root {
+  --primary-color: #3b82f6;
+  --primary-text: #0f172a;
+  --secondary-color: #64748b;
+  --secondary-text: #f8fafc;
+}
+`;
+		}
+
+		const terminator = syntax === 'scss' ? ';' : '';
+
+		return `// Edit these values to match your design.
+$primary-color: #3b82f6${terminator}
+$primary-text: #0f172a${terminator}
+$secondary-color: #64748b${terminator}
+$secondary-text: #f8fafc${terminator}
+`;
+	};
+
+	public static readonly getFontStyling = (fontFileNames: string[], fontFamily: string, syntax: StyleSyntax = 'sass'): string => {
 		const fontFaces = [...fontFileNames]
 			.sort((a, b) => a.localeCompare(b))
 			.map(fileName => {
@@ -77,17 +99,151 @@ $secondary-text: #f8fafc
 				const isItalic = baseName.includes('italic');
 				const isVariable = baseName.includes('variable') || (fontFamily === 'Inter' && baseName === 'inter');
 				const weight = getFontWeight(baseName);
-				const fontWeight = isVariable ? '100 900' : weight ?? '400';
 
-				return `@font-face
-	font-family: "${fontFamily}"
-	font-style: ${isItalic ? 'italic' : 'normal'}
-	font-weight: ${fontWeight}
-	font-display: swap
-	src: url("./assets/fonts/${fileName}") format("${getFontFormat(fileName)}")`;
-			})
-			.join('\n\n');
+				return {
+					family: fontFamily,
+					style: isItalic ? 'italic' : 'normal',
+					weight: isVariable ? '100 900' : weight ?? '400',
+					fileName,
+					format: getFontFormat(fileName),
+				};
+			});
 
-		return `/* ${fontFamily} */\n${fontFaces}\n`;
+		const renderedFaces = fontFaces.map(face => syntax === 'sass'
+			? `@font-face
+\tfont-family: "${face.family}"
+\tfont-style: ${face.style}
+\tfont-weight: ${face.weight}
+\tfont-display: swap
+\tsrc: url("./assets/fonts/${face.fileName}") format("${face.format}")`
+			: `@font-face {
+  font-family: "${face.family}";
+  font-style: ${face.style};
+  font-weight: ${face.weight};
+  font-display: swap;
+  src: url("./assets/fonts/${face.fileName}") format("${face.format}");
+}`).join('\n\n');
+
+		return `/* ${fontFamily} */\n${renderedFaces}\n`;
 	};
+
+	public static readonly getBaseStyles = (styling: Styling, syntax: StyleSyntax, tailwindMajor?: number): string => {
+		if (styling === 'tailwind') {
+			return tailwindMajor !== undefined && tailwindMajor < 4
+				? '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n'
+				: '@import "tailwindcss";\n';
+		}
+
+		if (syntax === 'sass') {
+			return `:root
+\tfont-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
+\tcolor: #0f172a
+\tbackground-color: #f8fafc
+
+*
+\tbox-sizing: border-box
+
+body
+\tmargin: 0
+\tmin-height: 100vh
+`;
+		}
+
+		return `:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+`;
+	};
+
+	public static readonly viteMain = (language: Language, styleImport: string): string => {
+		const rootExpression = language === 'typescript'
+			? "document.getElementById('root')!"
+			: "document.getElementById('root')";
+
+		return `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import '${styleImport}';
+
+ReactDOM.createRoot(${rootExpression}).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+`;
+	};
+
+	public static readonly viteApp = (): string => `function App() {
+  return <h1>Hello, world!</h1>;
+}
+
+export default App;
+`;
+
+	public static readonly nextLayout = (language: Language, styleImport: string): string => {
+		if (language === 'typescript') {
+			return `import type { ReactNode } from 'react';
+import '${styleImport}';
+
+export const metadata = {
+  title: 'React App',
+  description: 'Created with React Speedrun Tools',
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+`;
+		}
+
+		return `import '${styleImport}';
+
+export const metadata = {
+  title: 'React App',
+  description: 'Created with React Speedrun Tools',
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+`;
+	};
+
+	public static readonly nextPage = (): string => `export default function Home() {
+  return <h1>Hello, world!</h1>;
+}
+`;
+
+	public static readonly indexHtml = (entryPath: string): string => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="${entryPath}"></script>
+  </body>
+</html>
+`;
 }
