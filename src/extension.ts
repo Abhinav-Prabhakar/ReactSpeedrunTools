@@ -100,7 +100,7 @@ async function removeBoilerplate() {
 	}
 	if (fs.existsSync(path.join(projectPaths.source, 'App.tsx')) || fs.existsSync(path.join(projectPaths.source, 'index.tsx'))) {
 		vscode.window.showWarningMessage(
-			'React Speedrun Tools: this project uses TypeScript entry files. TypeScript support is planned, so no files were changed.'
+			'React Speedrun Tools: the legacy CRA cleanup command only supports JavaScript entry files. No files were changed.'
 		);
 		return;
 	}

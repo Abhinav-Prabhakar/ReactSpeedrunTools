@@ -89,10 +89,15 @@ async function scaffoldViteApp(project: ProjectInfo): Promise<void> {
 		return;
 	}
 
-	if (project.syntax === 'scss' || project.syntax === 'sass') {
-		await installSass(project.root);
+	await installSassIfNeeded(project);
+
+	if (!hasDependency(project.root, 'vite')) {
+		vscode.window.showWarningMessage(
+			'React Speedrun Tools: Vite is not installed in this project. Install vite and @vitejs/plugin-react to run these files.'
+		);
 	}
 
+	warnIfTailwindIsMissing(project);
 	warnIfTypeScriptIsMissing(project);
 	vscode.window.showInformationMessage('React Speedrun Tools: Vite app files scaffolded.');
 }
@@ -135,10 +140,8 @@ async function scaffoldNextApp(project: ProjectInfo): Promise<void> {
 		return;
 	}
 
-	if (project.syntax === 'scss' || project.syntax === 'sass') {
-		await installSass(project.root);
-	}
-
+	await installSassIfNeeded(project);
+	warnIfTailwindIsMissing(project);
 	warnIfTypeScriptIsMissing(project);
 	vscode.window.showInformationMessage('React Speedrun Tools: Next.js App Router files scaffolded.');
 }
@@ -177,6 +180,23 @@ function getTailwindMajor(root: string): number | undefined {
 	}
 	const major = Number.parseInt(version.replace(/^[^\d]*/, ''), 10);
 	return Number.isNaN(major) ? undefined : major;
+}
+
+async function installSassIfNeeded(project: ProjectInfo): Promise<void> {
+	const needsSass = project.syntax === 'scss' || project.syntax === 'sass';
+	const hasSass = hasDependency(project.root, 'sass') || hasDependency(project.root, 'sass-embedded');
+
+	if (needsSass && !hasSass) {
+		await installSass(project.root);
+	}
+}
+
+function warnIfTailwindIsMissing(project: ProjectInfo): void {
+	if (project.styling === 'tailwind' && !hasDependency(project.root, 'tailwindcss')) {
+		vscode.window.showWarningMessage(
+			'React Speedrun Tools: Tailwind CSS is selected, but tailwindcss is not installed in this project.'
+		);
+	}
 }
 
 function warnIfTypeScriptIsMissing(project: ProjectInfo): void {
