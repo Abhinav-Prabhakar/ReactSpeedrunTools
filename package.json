@@ -11,6 +11,16 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "React Speedrun Tools inspects project files and runs your package manager, so it needs a local workspace."
+    },
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "File generation works, but Sass is not installed automatically in untrusted workspaces."
+    }
+  },
   "contributes": {
     "commands": [
       {

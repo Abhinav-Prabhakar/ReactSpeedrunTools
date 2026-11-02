@@ -1,5 +1,5 @@
-import * as fs from 'fs';
 import * as path from 'path';
+import { pathExists, readTextFile } from './utils';
 
 export type ProjectKind = 'vite' | 'next' | 'cra' | 'remix' | 'react-router' | 'react' | 'unknown';
 export type Language = 'javascript' | 'typescript';
@@ -27,85 +27,94 @@ export interface ProjectInfo {
 	appRoot?: string;
 }
 
-export function getPackageJson(root: string): PackageJson | undefined {
-	const packageJsonPath = path.join(root, 'package.json');
+export async function getPackageJson(root: string): Promise<PackageJson | undefined> {
+	const contents = await readTextFile(path.join(root, 'package.json'));
 
-	if (!fs.existsSync(packageJsonPath)) {
+	if (!contents) {
 		return undefined;
 	}
 
 	try {
-		return JSON.parse(fs.readFileSync(packageJsonPath, { encoding: 'utf-8' })) as PackageJson;
+		return JSON.parse(contents) as PackageJson;
 	} catch {
 		return undefined;
 	}
 }
 
-export function hasDependency(root: string, dependency: string): boolean {
-	const packageJson = getPackageJson(root);
-
-	return Boolean(packageJson?.dependencies?.[dependency] || packageJson?.devDependencies?.[dependency]);
+export async function hasDependency(root: string, dependency: string): Promise<boolean> {
+	return hasDependencyIn(await getPackageJson(root), dependency);
 }
 
-export function getDependencyVersion(root: string, dependency: string): string | undefined {
-	const packageJson = getPackageJson(root);
+export async function getDependencyVersion(root: string, dependency: string): Promise<string | undefined> {
+	const packageJson = await getPackageJson(root);
 
 	return packageJson?.dependencies?.[dependency] ?? packageJson?.devDependencies?.[dependency];
 }
 
-export function getProjectInfo(
+function hasDependencyIn(packageJson: PackageJson | undefined, dependency: string): boolean {
+	return Boolean(packageJson?.dependencies?.[dependency] || packageJson?.devDependencies?.[dependency]);
+}
+
+export async function getProjectInfo(
 	root: string,
 	languageSetting: LanguageSetting = 'auto',
 	stylingSetting: StylingSetting = 'auto'
-): ProjectInfo {
-	const kind = detectProjectKind(root);
-	const language = detectLanguage(root, languageSetting);
-	const styling = detectStyling(root, stylingSetting);
+): Promise<ProjectInfo> {
+	const packageJson = await getPackageJson(root);
+	const kind = detectProjectKind(packageJson);
+	const [language, styling] = await Promise.all([
+		detectLanguage(root, packageJson, languageSetting),
+		detectStyling(root, packageJson, stylingSetting),
+	]);
 	const initialSyntax = getSyntax(styling);
-	const appRoot = kind === 'next' ? getNextAppRoot(root) : undefined;
+	const appRoot = kind === 'next' ? await getNextAppRoot(root) : undefined;
 	const sourceRoot = appRoot ?? path.join(root, 'src');
-	const componentsRoot = getComponentsRoot(root, kind);
+	const componentsRoot = await getComponentsRoot(root, kind);
 	const assetsRoot = kind === 'next' ? path.join(sourceRoot, 'assets') : path.join(root, 'src', 'assets');
-	const stylesPath = getStylesPath(root, kind, initialSyntax, appRoot);
+	const stylesPath = await getStylesPath(root, kind, initialSyntax, appRoot);
 	const syntax = getSyntaxFromPath(stylesPath) ?? initialSyntax;
 
 	return { root, kind, language, styling, syntax, sourceRoot, componentsRoot, assetsRoot, stylesPath, appRoot };
 }
 
-function detectProjectKind(root: string): ProjectKind {
-	if (hasDependency(root, 'next')) {
+function detectProjectKind(packageJson: PackageJson | undefined): ProjectKind {
+	if (hasDependencyIn(packageJson, 'next')) {
 		return 'next';
 	}
 
-	if (hasDependency(root, 'vite')) {
+	if (hasDependencyIn(packageJson, 'vite')) {
 		return 'vite';
 	}
 
-	if (hasDependency(root, 'react-scripts')) {
+	if (hasDependencyIn(packageJson, 'react-scripts')) {
 		return 'cra';
 	}
 
-	if (hasDependency(root, '@remix-run/react')) {
+	if (hasDependencyIn(packageJson, '@remix-run/react')) {
 		return 'remix';
 	}
 
-	if (hasDependency(root, '@react-router/dev')) {
+	if (hasDependencyIn(packageJson, '@react-router/dev')) {
 		return 'react-router';
 	}
 
-	if (hasDependency(root, 'react')) {
+	if (hasDependencyIn(packageJson, 'react')) {
 		return 'react';
 	}
 
 	return 'unknown';
 }
 
-function detectLanguage(root: string, setting: LanguageSetting): Language {
+async function detectLanguage(
+	root: string,
+	packageJson: PackageJson | undefined,
+	setting: LanguageSetting
+): Promise<Language> {
 	if (setting !== 'auto') {
 		return setting;
 	}
 
-	if (fs.existsSync(path.join(root, 'tsconfig.json')) || hasDependency(root, 'typescript')) {
+	if (hasDependencyIn(packageJson, 'typescript') || await pathExists(path.join(root, 'tsconfig.json'))) {
 		return 'typescript';
 	}
 
@@ -120,42 +129,56 @@ function detectLanguage(root: string, setting: LanguageSetting): Language {
 		'src/app/layout.tsx',
 		'src/app/page.tsx',
 	];
+	const matches = await Promise.all(typescriptFiles.map(file => pathExists(path.join(root, file))));
 
-	return typescriptFiles.some(file => fs.existsSync(path.join(root, file))) ? 'typescript' : 'javascript';
+	return matches.some(Boolean) ? 'typescript' : 'javascript';
 }
 
-function detectStyling(root: string, setting: StylingSetting): Styling {
+async function detectStyling(
+	root: string,
+	packageJson: PackageJson | undefined,
+	setting: StylingSetting
+): Promise<Styling> {
 	if (setting !== 'auto') {
 		return setting;
 	}
 
-	if (hasDependency(root, 'tailwindcss')) {
+	if (hasDependencyIn(packageJson, 'tailwindcss')) {
 		return 'tailwind';
 	}
 
-	if (
-		fs.existsSync(path.join(root, 'src/index.sass')) ||
-		fs.existsSync(path.join(root, 'app/globals.sass')) ||
-		fs.existsSync(path.join(root, 'src/app/globals.sass')) ||
-		fs.existsSync(path.join(root, 'styles/globals.sass'))
-	) {
+	const sassFiles = [
+		'src/index.sass',
+		'app/globals.sass',
+		'src/app/globals.sass',
+		'styles/globals.sass',
+	];
+	const scssFiles = [
+		'src/index.scss',
+		'app/globals.scss',
+		'src/app/globals.scss',
+		'styles/globals.scss',
+	];
+	const [hasSassFile, hasScssFile] = await Promise.all([
+		anyPathExists(root, sassFiles),
+		anyPathExists(root, scssFiles),
+	]);
+
+	if (hasSassFile) {
 		return 'sass';
 	}
 
-	if (
-		fs.existsSync(path.join(root, 'src/index.scss')) ||
-		fs.existsSync(path.join(root, 'app/globals.scss')) ||
-		fs.existsSync(path.join(root, 'src/app/globals.scss')) ||
-		fs.existsSync(path.join(root, 'styles/globals.scss'))
-	) {
-		return 'scss';
-	}
-
-	if (hasDependency(root, 'sass') || hasDependency(root, 'sass-embedded')) {
+	if (hasScssFile || hasDependencyIn(packageJson, 'sass') || hasDependencyIn(packageJson, 'sass-embedded')) {
 		return 'scss';
 	}
 
 	return 'css';
+}
+
+async function anyPathExists(root: string, files: string[]): Promise<boolean> {
+	const matches = await Promise.all(files.map(file => pathExists(path.join(root, file))));
+
+	return matches.some(Boolean);
 }
 
 function getSyntax(styling: Styling): StyleSyntax {
@@ -175,15 +198,17 @@ function getSyntaxFromPath(stylesPath: string): StyleSyntax | undefined {
 	}
 }
 
-function getNextAppRoot(root: string): string {
+async function getNextAppRoot(root: string): Promise<string> {
 	const srcApp = path.join(root, 'src', 'app');
 
-	return fs.existsSync(srcApp) ? srcApp : path.join(root, 'app');
+	return await pathExists(srcApp) ? srcApp : path.join(root, 'app');
 }
 
-function getComponentsRoot(root: string, kind: ProjectKind): string {
+async function getComponentsRoot(root: string, kind: ProjectKind): Promise<string> {
 	if (kind === 'next') {
-		return fs.existsSync(path.join(root, 'src')) ? path.join(root, 'src', 'components') : path.join(root, 'components');
+		return await pathExists(path.join(root, 'src'))
+			? path.join(root, 'src', 'components')
+			: path.join(root, 'components');
 	}
 
 	if (kind === 'remix' || kind === 'react-router') {
@@ -193,7 +218,12 @@ function getComponentsRoot(root: string, kind: ProjectKind): string {
 	return path.join(root, 'src', 'components');
 }
 
-function getStylesPath(root: string, kind: ProjectKind, syntax: StyleSyntax, appRoot?: string): string {
+async function getStylesPath(
+	root: string,
+	kind: ProjectKind,
+	syntax: StyleSyntax,
+	appRoot?: string
+): Promise<string> {
 	const extension = syntax === 'scss' ? 'scss' : syntax === 'sass' ? 'sass' : 'css';
 	const indexCandidates = [
 		path.join(root, 'src', 'index.scss'),
@@ -218,10 +248,11 @@ function getStylesPath(root: string, kind: ProjectKind, syntax: StyleSyntax, app
 		: kind === 'cra'
 			? [...indexCandidates.slice(3), ...indexCandidates.slice(0, 3)]
 			: indexCandidates;
-	const existing = candidates.find(candidate => fs.existsSync(candidate));
+	const matches = await Promise.all(candidates.map(candidate => pathExists(candidate)));
+	const existingIndex = matches.findIndex(Boolean);
 
-	if (existing) {
-		return existing;
+	if (existingIndex >= 0) {
+		return candidates[existingIndex];
 	}
 
 	if (kind === 'next' && appRoot) {

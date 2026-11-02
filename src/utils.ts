@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import type { StyleSyntax } from './project';
@@ -9,42 +8,218 @@ export interface PackageManager {
 	args: string[];
 }
 
+export interface BackupResult {
+	directory: string;
+	files: string[];
+}
+
 let outputChannel: vscode.OutputChannel | undefined;
+let storageRoot: string | undefined;
+
+export class OperationCancelledError extends Error {
+	public constructor() {
+		super('Operation cancelled');
+		this.name = 'OperationCancelledError';
+	}
+}
 
 export function setOutputChannel(channel: vscode.OutputChannel): void {
 	outputChannel = channel;
 }
 
-export function ensureDirectory(directory: string): void {
-	fs.mkdirSync(directory, { recursive: true });
+export function setStorageRoot(root: string): void {
+	storageRoot = root;
 }
 
-export function readFileIfExists(filePath: string): string {
-	return fs.existsSync(filePath) ? fs.readFileSync(filePath, { encoding: 'utf-8' }) : '';
+export function log(message: string): void {
+	outputChannel?.appendLine(message);
 }
 
-export function writeFileEnsuringDirectory(filePath: string, contents: string): void {
-	ensureDirectory(path.dirname(filePath));
-	fs.writeFileSync(filePath, contents);
+export function showOutput(): void {
+	outputChannel?.show(true);
 }
 
-export function copyDirectory(source: string, destination: string): void {
-	ensureDirectory(destination);
+export function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
 
-	for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-		const sourceEntry = path.join(source, entry.name);
-		const destinationEntry = path.join(destination, entry.name);
+export function isOperationCancelled(error: unknown): boolean {
+	return error instanceof OperationCancelledError;
+}
 
-		if (entry.isDirectory()) {
-			copyDirectory(sourceEntry, destinationEntry);
-		} else {
-			fs.copyFileSync(sourceEntry, destinationEntry);
+export function checkCancellation(token: vscode.CancellationToken): void {
+	if (token.isCancellationRequested) {
+		throw new OperationCancelledError();
+	}
+}
+
+export function runWithProgress<T>(
+	title: string,
+	task: (progress: vscode.Progress<{ message?: string }>, token: vscode.CancellationToken) => Promise<T>
+): Thenable<T> {
+	return vscode.window.withProgress(
+		{
+			location: vscode.ProgressLocation.Notification,
+			title,
+			cancellable: true,
+		},
+		task
+	);
+}
+
+function toUri(filePath: string): vscode.Uri {
+	return vscode.Uri.file(filePath);
+}
+
+function isMissingFile(error: unknown): boolean {
+	if (typeof error !== 'object' || error === null || !('code' in error)) {
+		return false;
+	}
+
+	const code = (error as { code?: string }).code;
+	return code === 'FileNotFound' || code === 'EntryNotFound' || code === 'ENOENT';
+}
+
+export async function pathExists(filePath: string): Promise<boolean> {
+	try {
+		await vscode.workspace.fs.stat(toUri(filePath));
+		return true;
+	} catch (error) {
+		if (isMissingFile(error)) {
+			return false;
+		}
+		throw error;
+	}
+}
+
+export async function readTextFile(filePath: string): Promise<string> {
+	try {
+		const contents = await vscode.workspace.fs.readFile(toUri(filePath));
+		return Buffer.from(contents).toString('utf8');
+	} catch (error) {
+		if (isMissingFile(error)) {
+			return '';
+		}
+		throw error;
+	}
+}
+
+export async function ensureDirectory(directory: string): Promise<void> {
+	try {
+		await vscode.workspace.fs.createDirectory(toUri(directory));
+	} catch (error) {
+		if (!(await pathExists(directory))) {
+			throw error;
 		}
 	}
 }
 
-export function ensureStyleImport(stylesPath: string, syntax: StyleSyntax, moduleName: string): void {
-	const existingStyles = readFileIfExists(stylesPath);
+export async function writeTextFile(filePath: string, contents: string): Promise<void> {
+	await ensureDirectory(path.dirname(filePath));
+	await vscode.workspace.fs.writeFile(toUri(filePath), Buffer.from(contents, 'utf8'));
+}
+
+export async function deletePath(filePath: string): Promise<void> {
+	try {
+		await vscode.workspace.fs.delete(toUri(filePath), { recursive: true, useTrash: true });
+	} catch (error) {
+		if (isMissingFile(error)) {
+			return;
+		}
+
+		// Some remote or virtual file systems do not support the trash.
+		try {
+			await vscode.workspace.fs.delete(toUri(filePath), { recursive: true, useTrash: false });
+		} catch (fallbackError) {
+			if (!isMissingFile(fallbackError)) {
+				throw fallbackError;
+			}
+		}
+	}
+}
+
+export async function listFileNames(directory: string): Promise<string[]> {
+	try {
+		const entries = await vscode.workspace.fs.readDirectory(toUri(directory));
+		return entries
+			.filter(([, type]) => (type & vscode.FileType.File) !== 0)
+			.map(([name]) => name);
+	} catch (error) {
+		if (isMissingFile(error)) {
+			return [];
+		}
+		throw error;
+	}
+}
+
+export async function copyDirectory(source: string, destination: string): Promise<void> {
+	await ensureDirectory(destination);
+
+	for (const [name, type] of await vscode.workspace.fs.readDirectory(toUri(source))) {
+		const sourceEntry = path.join(source, name);
+		const destinationEntry = path.join(destination, name);
+
+		if ((type & vscode.FileType.Directory) !== 0) {
+			await copyDirectory(sourceEntry, destinationEntry);
+		} else {
+			await vscode.workspace.fs.copy(toUri(sourceEntry), toUri(destinationEntry), { overwrite: true });
+		}
+	}
+}
+
+/**
+ * Copies files into extension storage before they are deleted or overwritten.
+ * Backups live outside the project so they never pollute the user's repository.
+ */
+export async function backupFiles(
+	workspaceRoot: string,
+	files: string[],
+	label: string
+): Promise<BackupResult | undefined> {
+	if (!storageRoot) {
+		log('Backups are unavailable because extension storage was not initialized.');
+		return undefined;
+	}
+
+	const existing: string[] = [];
+	for (const file of files) {
+		if (await pathExists(file)) {
+			existing.push(file);
+		}
+	}
+
+	if (existing.length === 0) {
+		return undefined;
+	}
+
+	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+	const directory = path.join(storageRoot, 'backups', `${timestamp}-${label}`);
+
+	for (const file of existing) {
+		const relativePath = path.relative(workspaceRoot, file);
+		const destination = path.join(directory, relativePath);
+		await ensureDirectory(path.dirname(destination));
+		await vscode.workspace.fs.copy(toUri(file), toUri(destination), { overwrite: true });
+	}
+
+	log(`Backed up ${existing.length} file(s) to ${directory}`);
+	return { directory, files: existing };
+}
+
+export async function revealBackup(backup: BackupResult | undefined): Promise<void> {
+	if (!backup) {
+		return;
+	}
+
+	try {
+		await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(backup.directory));
+	} catch (error) {
+		log(`Could not reveal backup folder: ${getErrorMessage(error)}`);
+	}
+}
+
+export async function ensureStyleImport(stylesPath: string, syntax: StyleSyntax, moduleName: string): Promise<void> {
+	const existingStyles = await readTextFile(stylesPath);
 	const importPattern = new RegExp(`@(use|import)\\s+["']?(?:\\./)?${moduleName}(?:\\.css)?["']?`);
 
 	if (importPattern.test(existingStyles)) {
@@ -57,19 +232,19 @@ export function ensureStyleImport(stylesPath: string, syntax: StyleSyntax, modul
 			? `@use "${moduleName}" as *;`
 			: `@use "${moduleName}" as *`;
 
-	writeFileEnsuringDirectory(stylesPath, `${statement}\n${existingStyles}`);
+	await writeTextFile(stylesPath, `${statement}\n${existingStyles}`);
 }
 
-export function detectPackageManager(root: string): PackageManager {
-	if (fs.existsSync(path.join(root, 'bun.lockb')) || fs.existsSync(path.join(root, 'bun.lock'))) {
+export async function detectPackageManager(root: string): Promise<PackageManager> {
+	if (await pathExists(path.join(root, 'bun.lockb')) || await pathExists(path.join(root, 'bun.lock'))) {
 		return { command: 'bun', args: ['add', '-d', 'sass'] };
 	}
 
-	if (fs.existsSync(path.join(root, 'pnpm-lock.yaml'))) {
+	if (await pathExists(path.join(root, 'pnpm-lock.yaml'))) {
 		return { command: 'pnpm', args: ['add', '-D', 'sass'] };
 	}
 
-	if (fs.existsSync(path.join(root, 'yarn.lock'))) {
+	if (await pathExists(path.join(root, 'yarn.lock'))) {
 		return { command: 'yarn', args: ['add', '--dev', 'sass'] };
 	}
 
@@ -77,14 +252,22 @@ export function detectPackageManager(root: string): PackageManager {
 }
 
 export async function installSass(root: string): Promise<boolean> {
-	const packageManager = detectPackageManager(root);
+	if (!vscode.workspace.isTrusted) {
+		log('Skipped installing Sass because the workspace is not trusted.');
+		vscode.window.showWarningMessage(
+			'React Speedrun Tools: Sass was not installed automatically because this workspace is not trusted. Install it manually with your package manager.'
+		);
+		return false;
+	}
+
+	const packageManager = await detectPackageManager(root);
 
 	return vscode.window.withProgress({
 		location: vscode.ProgressLocation.Notification,
 		title: `React Speedrun Tools: installing Sass with ${packageManager.command}…`,
 		cancellable: false,
 	}, () => new Promise<boolean>((resolve) => {
-		outputChannel?.appendLine(`Running: ${packageManager.command} ${packageManager.args.join(' ')} (cwd: ${root})`);
+		log(`Running: ${packageManager.command} ${packageManager.args.join(' ')} (cwd: ${root})`);
 
 		const child = spawn(packageManager.command, packageManager.args, {
 			cwd: root,
@@ -96,13 +279,13 @@ export async function installSass(root: string): Promise<boolean> {
 		child.stderr?.on('data', (data: Buffer) => outputChannel?.append(data.toString()));
 
 		child.on('error', (error) => {
-			outputChannel?.appendLine(`Failed to start ${packageManager.command}: ${error.message}`);
+			log(`Failed to start ${packageManager.command}: ${error.message}`);
 			vscode.window.showErrorMessage(
 				`React Speedrun Tools: could not run ${packageManager.command}. Is it installed?`,
 				'Show Output'
 			).then(action => {
 				if (action === 'Show Output') {
-					outputChannel?.show();
+					showOutput();
 				}
 			});
 			resolve(false);
@@ -114,13 +297,13 @@ export async function installSass(root: string): Promise<boolean> {
 				return;
 			}
 
-			outputChannel?.appendLine(`${packageManager.command} exited with code ${code}.`);
+			log(`${packageManager.command} exited with code ${code}.`);
 			vscode.window.showErrorMessage(
 				`React Speedrun Tools: failed to install Sass (exit code ${code}).`,
 				'Show Output'
 			).then(action => {
 				if (action === 'Show Output') {
-					outputChannel?.show();
+					showOutput();
 				}
 			});
 			resolve(false);
