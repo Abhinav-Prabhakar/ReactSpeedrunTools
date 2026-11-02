@@ -9,6 +9,8 @@ All notable changes to this extension are documented here.
 - Project-aware detection for Vite, Next.js, Create React App, Remix, React
   Router, and generic React projects.
 - **Scaffold React App Files** for Vite and Next.js App Router projects.
+- Remix and React Router scaffolding (`app/root`, routes, styles, and route
+  config).
 - TypeScript component and scaffold output.
 - CSS, SCSS, Sass, and Tailwind-aware style generation.
 - `reactSpeedrunTools.language` and `reactSpeedrunTools.styling` settings.
@@ -25,7 +27,8 @@ All notable changes to this extension are documented here.
 - Replaced the destructive CRA `src` cleanup with a confirmed, starter-file-only
   command that keeps unrelated files.
 - Font and color commands now write to the project's detected stylesheet and
-  syntax.
+  syntax, with font URLs relative to that stylesheet.
+- Project detection checks Next.js, Remix, and React Router before Vite.
 - Component creation validates names, supports TypeScript, confirms overwrites,
   and places the cursor on the `return` line.
 

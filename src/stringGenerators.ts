@@ -91,7 +91,13 @@ $secondary-text: #f8fafc${terminator}
 `;
 	};
 
-	public static readonly getFontStyling = (fontFileNames: string[], fontFamily: string, syntax: StyleSyntax = 'sass'): string => {
+	public static readonly getFontStyling = (
+		fontFileNames: string[],
+		fontFamily: string,
+		syntax: StyleSyntax = 'sass',
+		fontUrlPrefix: string = './assets/fonts'
+	): string => {
+		const baseUrl = fontUrlPrefix.replace(/\/+$/, '') || '.';
 		const fontFaces = [...fontFileNames]
 			.sort((a, b) => a.localeCompare(b))
 			.map(fileName => {
@@ -115,13 +121,13 @@ $secondary-text: #f8fafc${terminator}
 \tfont-style: ${face.style}
 \tfont-weight: ${face.weight}
 \tfont-display: swap
-\tsrc: url("./assets/fonts/${face.fileName}") format("${face.format}")`
+\tsrc: url("${baseUrl}/${face.fileName}") format("${face.format}")`
 			: `@font-face {
   font-family: "${face.family}";
   font-style: ${face.style};
   font-weight: ${face.weight};
   font-display: swap;
-  src: url("./assets/fonts/${face.fileName}") format("${face.format}");
+  src: url("${baseUrl}/${face.fileName}") format("${face.format}");
 }`).join('\n\n');
 
 		return `/* ${fontFamily} */\n${renderedFaces}\n`;
@@ -231,6 +237,135 @@ export default function RootLayout({ children }) {
 	public static readonly nextPage = (): string => `export default function Home() {
   return <h1>Hello, world!</h1>;
 }
+`;
+
+	public static readonly remixRoot = (language: Language, styleImport: string): string => {
+		if (language === 'typescript') {
+			return `import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
+import type { ReactNode } from 'react';
+import '${styleImport}';
+
+export function Layout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export default function App() {
+  return <Outlet />;
+}
+`;
+		}
+
+		return `import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
+import '${styleImport}';
+
+export function Layout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export default function App() {
+  return <Outlet />;
+}
+`;
+	};
+
+	public static readonly reactRouterRoot = (language: Language, styleImport: string): string => {
+		if (language === 'typescript') {
+			return `import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import type { ReactNode } from 'react';
+import '${styleImport}';
+
+export function Layout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export default function App() {
+  return <Outlet />;
+}
+`;
+		}
+
+		return `import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import '${styleImport}';
+
+export function Layout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export default function App() {
+  return <Outlet />;
+}
+`;
+	};
+
+	public static readonly homePage = (): string => `export default function Home() {
+  return <h1>Hello, world!</h1>;
+}
+`;
+
+	public static readonly reactRouterRoutes = (language: Language): string => language === 'typescript'
+		? `import { type RouteConfig, index } from '@react-router/dev/routes';
+
+export default [index('routes/home')] satisfies RouteConfig;
+`
+		: `import { index } from '@react-router/dev/routes';
+
+export default [index('routes/home')];
 `;
 
 	public static readonly indexHtml = (entryPath: string): string => `<!doctype html>

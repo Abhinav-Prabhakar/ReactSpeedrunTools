@@ -47,6 +47,47 @@ suite('StringGenerators', () => {
 		assert.match(output, /Poppins-Regular\.woff2/);
 	});
 
+	test('font URLs honor a custom relative prefix', () => {
+		const output = StringGenerators.getFontStyling(
+			['Inter.woff2'],
+			'Inter',
+			'css',
+			'../app/assets/fonts'
+		);
+
+		assert.match(output, /url\("\.\.\/app\/assets\/fonts\/Inter\.woff2"\)/);
+	});
+
+	test('Remix root imports Remix routing primitives and the stylesheet', () => {
+		const typescript = StringGenerators.remixRoot('typescript', './app.css');
+		const javascript = StringGenerators.remixRoot('javascript', './app.css');
+
+		assert.match(typescript, /from '@remix-run\/react'/);
+		assert.match(typescript, /import '\.\/app\.css';/);
+		assert.match(typescript, /ReactNode/);
+		assert.match(typescript, /<Outlet \/>/);
+		assert.doesNotMatch(javascript, /ReactNode/);
+		assert.match(javascript, /<ScrollRestoration \/>/);
+	});
+
+	test('React Router root imports routing primitives from react-router', () => {
+		const output = StringGenerators.reactRouterRoot('typescript', './app.css');
+
+		assert.match(output, /from 'react-router'/);
+		assert.match(output, /import '\.\/app\.css';/);
+		assert.match(output, /<ScrollRestoration \/>/);
+	});
+
+	test('React Router route config registers the home route', () => {
+		const typescript = StringGenerators.reactRouterRoutes('typescript');
+		const javascript = StringGenerators.reactRouterRoutes('javascript');
+
+		assert.match(typescript, /index\('routes\/home'\)/);
+		assert.match(typescript, /satisfies RouteConfig/);
+		assert.doesNotMatch(javascript, /satisfies RouteConfig/);
+		assert.match(javascript, /index\('routes\/home'\)/);
+	});
+
 	test('variable fonts use a weight range', () => {
 		const output = StringGenerators.getFontStyling(['Inter.ttf'], 'Inter', 'scss');
 

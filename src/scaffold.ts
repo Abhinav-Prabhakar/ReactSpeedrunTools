@@ -54,10 +54,10 @@ export async function scaffoldReactApp(project: ProjectInfo): Promise<void> {
 			);
 			return;
 		case 'remix':
+			await scaffoldRemixApp(project);
+			return;
 		case 'react-router':
-			vscode.window.showInformationMessage(
-				'React Speedrun Tools: scaffolding for Remix and React Router is not supported yet.'
-			);
+			await scaffoldReactRouterApp(project);
 			return;
 		default:
 			vscode.window.showWarningMessage(
@@ -196,6 +196,144 @@ async function scaffoldNextApp(project: ProjectInfo): Promise<void> {
 	await warnIfTypeScriptIsMissing(project);
 	await warnIfTailwindIsMissing(project);
 	vscode.window.showInformationMessage('React Speedrun Tools: Next.js App Router files scaffolded.');
+}
+
+function getStyleImport(fromDirectory: string, stylePath: string): string {
+	const relative = path.relative(fromDirectory, stylePath).split(path.sep).join('/');
+
+	return relative.startsWith('.') ? relative : `./${relative}`;
+}
+
+async function findRouteConfig(appRoot: string): Promise<string | undefined> {
+	for (const fileName of ['routes.ts', 'routes.js', 'routes.tsx', 'routes.jsx']) {
+		const candidate = path.join(appRoot, fileName);
+		if (await pathExists(candidate)) {
+			return candidate;
+		}
+	}
+
+	return undefined;
+}
+
+async function scaffoldRemixApp(project: ProjectInfo): Promise<void> {
+	const appRoot = project.appRoot ?? path.join(project.root, 'app');
+	const extension = project.language === 'typescript' ? 'tsx' : 'jsx';
+	const rootPath = path.join(appRoot, `root.${extension}`);
+	const routePath = path.join(appRoot, 'routes', `_index.${extension}`);
+	const stylePath = project.stylesPath;
+	const styleImport = getStyleImport(appRoot, stylePath);
+	const styleExists = await pathExists(stylePath);
+
+	if (await pathExists(rootPath) || await pathExists(routePath)) {
+		vscode.window.showInformationMessage(
+			'React Speedrun Tools: Remix root or index route already exists. Nothing was changed.'
+		);
+		return;
+	}
+
+	const routeConfig = await findRouteConfig(appRoot);
+
+	try {
+		await runWithProgress('React Speedrun Tools: scaffolding Remix app files', async (progress, token) => {
+			progress.report({ message: 'Writing app files' });
+			checkCancellation(token);
+			await ensureDirectory(appRoot);
+			await ensureDirectory(path.dirname(routePath));
+			await writeTextFile(rootPath, StringGenerators.remixRoot(project.language, styleImport));
+			checkCancellation(token);
+			await writeTextFile(routePath, StringGenerators.homePage());
+
+			if (!styleExists) {
+				await writeTextFile(
+					stylePath,
+					StringGenerators.getBaseStyles(project.styling, project.syntax, await getTailwindMajor(project.root))
+				);
+			}
+		});
+	} catch (error) {
+		if (isOperationCancelled(error)) {
+			vscode.window.showInformationMessage('React Speedrun Tools: scaffolding cancelled.');
+			return;
+		}
+		vscode.window.showErrorMessage(`React Speedrun Tools: failed to scaffold the Remix app. ${getErrorMessage(error)}`);
+		return;
+	}
+
+	await installSassIfNeeded(project);
+	await warnIfTypeScriptIsMissing(project);
+	await warnIfTailwindIsMissing(project);
+
+	if (routeConfig && !(await readTextFile(routeConfig)).includes('_index')) {
+		vscode.window.showWarningMessage(
+			`React Speedrun Tools: ${path.relative(project.root, routeConfig)} exists. Add routes/_index to that route config if the project does not use file-based routing.`
+		);
+	}
+
+	vscode.window.showInformationMessage('React Speedrun Tools: Remix app files scaffolded.');
+}
+
+async function scaffoldReactRouterApp(project: ProjectInfo): Promise<void> {
+	const appRoot = project.appRoot ?? path.join(project.root, 'app');
+	const extension = project.language === 'typescript' ? 'tsx' : 'jsx';
+	const configExtension = project.language === 'typescript' ? 'ts' : 'js';
+	const rootPath = path.join(appRoot, `root.${extension}`);
+	const routePath = path.join(appRoot, 'routes', `home.${extension}`);
+	const stylePath = project.stylesPath;
+	const styleImport = getStyleImport(appRoot, stylePath);
+	const styleExists = await pathExists(stylePath);
+	const existingRouteConfig = await findRouteConfig(appRoot);
+	const routeConfigPath = existingRouteConfig ?? path.join(appRoot, `routes.${configExtension}`);
+
+	if (await pathExists(rootPath) || await pathExists(routePath)) {
+		vscode.window.showInformationMessage(
+			'React Speedrun Tools: React Router root or home route already exists. Nothing was changed.'
+		);
+		return;
+	}
+
+	try {
+		await runWithProgress('React Speedrun Tools: scaffolding React Router app files', async (progress, token) => {
+			progress.report({ message: 'Writing app files' });
+			checkCancellation(token);
+			await ensureDirectory(appRoot);
+			await ensureDirectory(path.dirname(routePath));
+			await writeTextFile(rootPath, StringGenerators.reactRouterRoot(project.language, styleImport));
+			checkCancellation(token);
+			await writeTextFile(routePath, StringGenerators.homePage());
+
+			if (!existingRouteConfig) {
+				await writeTextFile(routeConfigPath, StringGenerators.reactRouterRoutes(project.language));
+			}
+
+			if (!styleExists) {
+				await writeTextFile(
+					stylePath,
+					StringGenerators.getBaseStyles(project.styling, project.syntax, await getTailwindMajor(project.root))
+				);
+			}
+		});
+	} catch (error) {
+		if (isOperationCancelled(error)) {
+			vscode.window.showInformationMessage('React Speedrun Tools: scaffolding cancelled.');
+			return;
+		}
+		vscode.window.showErrorMessage(
+			`React Speedrun Tools: failed to scaffold the React Router app. ${getErrorMessage(error)}`
+		);
+		return;
+	}
+
+	await installSassIfNeeded(project);
+	await warnIfTypeScriptIsMissing(project);
+	await warnIfTailwindIsMissing(project);
+
+	if (existingRouteConfig && !(await readTextFile(existingRouteConfig)).includes('routes/home')) {
+		vscode.window.showWarningMessage(
+			`React Speedrun Tools: ${path.relative(project.root, existingRouteConfig)} exists. Add routes/home to that route config.`
+		);
+	}
+
+	vscode.window.showInformationMessage('React Speedrun Tools: React Router app files scaffolded.');
 }
 
 async function indexReferencesEntry(indexPath: string, entryPath: string): Promise<boolean> {

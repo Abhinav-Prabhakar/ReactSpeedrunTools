@@ -97,6 +97,7 @@ function logProject(project: ProjectInfo): void {
 		`  componentsRoot=${project.componentsRoot}`,
 		`  assetsRoot=${project.assetsRoot}`,
 		`  stylesPath=${project.stylesPath}`,
+		`  fontUrlPrefix=${project.fontUrlPrefix}`,
 	].join('\n'));
 }
 
@@ -344,7 +345,7 @@ async function addFont() {
 				const separator = existingFontStyles.length > 0 && !existingFontStyles.endsWith('\n') ? '\n\n' : '';
 				await writeTextFile(
 					fontStylesPath,
-					existingFontStyles + separator + StringGenerators.getFontStyling(fontFileNames, selectedFont, project.syntax)
+					existingFontStyles + separator + StringGenerators.getFontStyling(fontFileNames, selectedFont, project.syntax, project.fontUrlPrefix)
 				);
 			}
 

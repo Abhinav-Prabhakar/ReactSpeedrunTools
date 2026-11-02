@@ -43,9 +43,16 @@ The command adapts to the detected project:
 - **Next.js App Router** — creates `app/layout.{jsx,tsx}`,
   `app/page.{jsx,tsx}`, and `app/globals.{css,scss,sass}` (or the `src/app`
   equivalents). Existing App Router files are left untouched.
+- **Remix** — creates `app/root.{jsx,tsx}`, `app/routes/_index.{jsx,tsx}`, and
+  `app/app.{css,scss,sass}` (or the detected stylesheet). The root imports the
+  stylesheet. If `app/routes.ts` exists, the command warns that the new route may
+  need to be registered in that config.
+- **React Router** — creates `app/root.{jsx,tsx}`, `app/routes/home.{jsx,tsx}`,
+  `app/routes.{ts,js}` when no route config exists, and
+  `app/app.{css,scss,sass}` (or the detected stylesheet). If a route config
+  already exists, the command warns when `routes/home` is not registered.
 - **Generic React** — asks for confirmation before writing Vite-style files.
 - **Create React App** — points you at the legacy cleanup command.
-- **Remix / React Router** — reports that scaffolding is not supported yet.
 
 Existing files require a modal confirmation. A backup is created before any file
 is replaced, and the operation shows progress and can be cancelled. Sass is
@@ -69,10 +76,11 @@ Bundled families (WOFF2):
 - Plus Jakarta Sans
 - Roboto
 
-Fonts are copied to `src/assets/fonts` (or `app/assets/fonts` for Next.js).
-`@font-face` rules are generated with the correct weight, italic style, variable
-font range, format, and URL for CSS, SCSS, or Sass. Existing font blocks are not
-duplicated, and the stylesheet import is added automatically.
+Fonts are copied to `src/assets/fonts` or `app/assets/fonts` for Next.js, Remix,
+and React Router. `@font-face` rules are generated with the correct weight,
+italic style, variable font range, format, and a URL relative to the project's
+stylesheet. Existing font blocks are not duplicated, and the stylesheet import
+is added automatically.
 
 ### Generate Color Variables
 
@@ -119,9 +127,10 @@ Invalid values fall back to `auto` with a warning.
 | Generic React | `react` dependency |
 | Unknown | no matching dependency |
 
-Next.js is checked before Vite, and both are checked before CRA. Stylesheet
-detection covers `src/index.*`, `src/app.*`, and `app/globals.*` (including
-`src/app` and the Pages Router `styles/globals.*`).
+Next.js, Remix, and React Router are checked before Vite, so framework projects
+that use Vite are detected correctly. Stylesheet detection covers `src/index.*`,
+`src/app.*`, `app/globals.*`, `app/app.*`, `app/tailwind.*`, `app/styles/*`, and
+the Pages Router `styles/globals.*`.
 
 ## Safety and backups
 

@@ -24,6 +24,7 @@ export interface ProjectInfo {
 	componentsRoot: string;
 	assetsRoot: string;
 	stylesPath: string;
+	fontUrlPrefix: string;
 	appRoot?: string;
 }
 
@@ -67,27 +68,35 @@ export async function getProjectInfo(
 		detectStyling(root, packageJson, stylingSetting),
 	]);
 	const initialSyntax = getSyntax(styling);
-	const appRoot = kind === 'next' ? await getNextAppRoot(root) : undefined;
+	const usesAppDirectory = kind === 'next' || kind === 'remix' || kind === 'react-router';
+	const appRoot = usesAppDirectory ? await getAppRoot(root, kind) : undefined;
 	const sourceRoot = appRoot ?? path.join(root, 'src');
 	const componentsRoot = await getComponentsRoot(root, kind);
-	const assetsRoot = kind === 'next' ? path.join(sourceRoot, 'assets') : path.join(root, 'src', 'assets');
+	const assetsRoot = usesAppDirectory
+		? path.join(sourceRoot, 'assets')
+		: path.join(root, 'src', 'assets');
 	const stylesPath = await getStylesPath(root, kind, initialSyntax, appRoot);
 	const syntax = getSyntaxFromPath(stylesPath) ?? initialSyntax;
+	const fontUrlPrefix = getRelativeUrlPrefix(path.dirname(stylesPath), path.join(assetsRoot, 'fonts'));
 
-	return { root, kind, language, styling, syntax, sourceRoot, componentsRoot, assetsRoot, stylesPath, appRoot };
+	return {
+		root,
+		kind,
+		language,
+		styling,
+		syntax,
+		sourceRoot,
+		componentsRoot,
+		assetsRoot,
+		stylesPath,
+		fontUrlPrefix,
+		appRoot,
+	};
 }
 
 function detectProjectKind(packageJson: PackageJson | undefined): ProjectKind {
 	if (hasDependencyIn(packageJson, 'next')) {
 		return 'next';
-	}
-
-	if (hasDependencyIn(packageJson, 'vite')) {
-		return 'vite';
-	}
-
-	if (hasDependencyIn(packageJson, 'react-scripts')) {
-		return 'cra';
 	}
 
 	if (hasDependencyIn(packageJson, '@remix-run/react')) {
@@ -96,6 +105,14 @@ function detectProjectKind(packageJson: PackageJson | undefined): ProjectKind {
 
 	if (hasDependencyIn(packageJson, '@react-router/dev')) {
 		return 'react-router';
+	}
+
+	if (hasDependencyIn(packageJson, 'vite')) {
+		return 'vite';
+	}
+
+	if (hasDependencyIn(packageJson, 'react-scripts')) {
+		return 'cra';
 	}
 
 	if (hasDependencyIn(packageJson, 'react')) {
@@ -198,10 +215,24 @@ function getSyntaxFromPath(stylesPath: string): StyleSyntax | undefined {
 	}
 }
 
-async function getNextAppRoot(root: string): Promise<string> {
-	const srcApp = path.join(root, 'src', 'app');
+async function getAppRoot(root: string, kind: ProjectKind): Promise<string> {
+	if (kind === 'next') {
+		const srcApp = path.join(root, 'src', 'app');
 
-	return await pathExists(srcApp) ? srcApp : path.join(root, 'app');
+		return await pathExists(srcApp) ? srcApp : path.join(root, 'app');
+	}
+
+	return path.join(root, 'app');
+}
+
+function getRelativeUrlPrefix(fromDirectory: string, targetDirectory: string): string {
+	const relative = path.relative(fromDirectory, targetDirectory).split(path.sep).join('/');
+
+	if (!relative || relative === '.') {
+		return '.';
+	}
+
+	return relative.startsWith('.') ? relative : `./${relative}`;
 }
 
 async function getComponentsRoot(root: string, kind: ProjectKind): Promise<string> {
@@ -243,11 +274,32 @@ async function getStylesPath(
 			path.join(root, 'styles', 'globals.css'),
 		]
 		: [];
+	const appRouteCandidates = appRoot
+		? [
+			path.join(appRoot, 'app.scss'),
+			path.join(appRoot, 'app.sass'),
+			path.join(appRoot, 'app.css'),
+			path.join(appRoot, 'tailwind.scss'),
+			path.join(appRoot, 'tailwind.sass'),
+			path.join(appRoot, 'tailwind.css'),
+			path.join(appRoot, 'globals.scss'),
+			path.join(appRoot, 'globals.sass'),
+			path.join(appRoot, 'globals.css'),
+			path.join(appRoot, 'styles', 'app.scss'),
+			path.join(appRoot, 'styles', 'app.sass'),
+			path.join(appRoot, 'styles', 'app.css'),
+			path.join(appRoot, 'styles', 'global.scss'),
+			path.join(appRoot, 'styles', 'global.sass'),
+			path.join(appRoot, 'styles', 'global.css'),
+		]
+		: [];
 	const candidates = kind === 'next'
 		? nextCandidates
-		: kind === 'cra'
-			? [...indexCandidates.slice(3), ...indexCandidates.slice(0, 3)]
-			: indexCandidates;
+		: kind === 'remix' || kind === 'react-router'
+			? appRouteCandidates
+			: kind === 'cra'
+				? [...indexCandidates.slice(3), ...indexCandidates.slice(0, 3)]
+				: indexCandidates;
 	const matches = await Promise.all(candidates.map(candidate => pathExists(candidate)));
 	const existingIndex = matches.findIndex(Boolean);
 
@@ -257,6 +309,10 @@ async function getStylesPath(
 
 	if (kind === 'next' && appRoot) {
 		return path.join(appRoot, `globals.${extension}`);
+	}
+
+	if ((kind === 'remix' || kind === 'react-router') && appRoot) {
+		return path.join(appRoot, `app.${extension}`);
 	}
 
 	if (kind === 'cra') {
