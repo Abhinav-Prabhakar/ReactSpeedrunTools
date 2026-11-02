@@ -14,9 +14,14 @@
   "contributes": {
     "commands": [
       {
-      "command": "react-speedrun-tools.removeBoilerplate",
-      "category": "React Speedrun Tools",
-      "title": "Remove Boilerplate And Install Sass"
+        "command": "react-speedrun-tools.scaffoldReactApp",
+        "category": "React Speedrun Tools",
+        "title": "Scaffold React App Files"
+      },
+      {
+        "command": "react-speedrun-tools.removeBoilerplate",
+        "category": "React Speedrun Tools",
+        "title": "Clean Legacy CRA Boilerplate And Install Sass"
       },
       {
         "command": "react-speedrun-tools.createReactComponent",
@@ -33,7 +38,36 @@
         "category": "React Speedrun Tools",
         "title": "Generate Color Variables"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "React Speedrun Tools",
+      "properties": {
+        "reactSpeedrunTools.language": {
+          "type": "string",
+          "enum": ["auto", "javascript", "typescript"],
+          "enumDescriptions": [
+            "Detect the language from the project",
+            "Generate .jsx and .js files",
+            "Generate .tsx and .ts files"
+          ],
+          "default": "auto",
+          "description": "Language used when generating React files."
+        },
+        "reactSpeedrunTools.styling": {
+          "type": "string",
+          "enum": ["auto", "css", "scss", "sass", "tailwind"],
+          "enumDescriptions": [
+            "Detect the styling approach from the project",
+            "Plain CSS",
+            "SCSS",
+            "Indented Sass",
+            "Tailwind CSS"
+          ],
+          "default": "auto",
+          "description": "Styling approach used when scaffolding and generating styles."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
